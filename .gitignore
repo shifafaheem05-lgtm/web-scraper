@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+.env
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# build / test artefacts
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# scraper runtime data
+.webscraper_cache/
+output/*
+!output/.gitkeep

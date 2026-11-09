@@ -1,0 +1,11 @@
+# Defaults for `webscraper scrape --config examples/webscraper.toml`.
+# Keys are the long option names (dashes or underscores). Command-line options override this file.
+[scrape]
+max-pages = 5
+details = true
+workers = 4
+delay = 1.0
+min-rating = 4
+in-stock = true
+sort = "price"
+output = ["output/books.csv", "output/report.html"]
