@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
@@ -34,12 +35,16 @@ def _neutralize(value: Any) -> Any:
     return value
 
 
+_ILLEGAL_XLSX = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
 def _restore(value: str) -> str:
     return value[1:] if value.startswith("'") and value[1:].startswith(_FORMULA_PREFIXES) else value
 
 
 def _save_csv(books: Sequence[Book], path: Path) -> None:
-    with open(path, "w", newline="", encoding="utf-8") as fh:
+    # utf-8-sig = UTF-8 with a BOM, so Excel on Windows shows 'Café' instead of 'CafÃ©'
+    with open(path, "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.DictWriter(fh, fieldnames=FIELDS)
         writer.writeheader()
         for b in books:
@@ -93,7 +98,7 @@ def _save_xlsx(books: Sequence[Book], path: Path) -> None:
     for cell in ws[1]:
         cell.font = Font(bold=True)
     for b in books:
-        ws.append([_neutralize(b.as_dict()[f]) for f in FIELDS])
+        ws.append([_neutralize(_ILLEGAL_XLSX.sub("", v) if isinstance(v, str) else v) for v in map(b.as_dict().get, FIELDS)])
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
     widths = {"title": 45, "description": 60, "url": 50, "image_url": 40}
@@ -121,7 +126,7 @@ def save(books: Sequence[Book], path: PathLike, fmt: Optional[str] = None) -> Pa
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         _SAVERS[fmt](books, path)
-    except OSError as exc:
+    except (OSError, sqlite3.Error) as exc:
         raise ExportError(f"could not write {path}: {exc}") from None
     return path
 
@@ -132,7 +137,7 @@ def load_books(path: PathLike) -> List[Book]:
     fmt = infer_format(path)
     try:
         if fmt == "csv":
-            with open(path, newline="", encoding="utf-8") as fh:
+            with open(path, newline="", encoding="utf-8-sig") as fh:
                 return [Book.from_dict({k: _restore(v) if isinstance(v, str) else v for k, v in row.items()})
                         for row in csv.DictReader(fh)]
         if fmt == "json":

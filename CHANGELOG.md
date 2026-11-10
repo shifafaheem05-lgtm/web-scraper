@@ -29,6 +29,12 @@ All notable changes to this project are documented here. The format follows
 - One book card with an unreadable price aborted the whole crawl (the README already promised malformed items were skipped).
 - `Ctrl+C` discarded everything scraped so far; partial results are now saved (exit code 130).
 - CSV/Excel exports were vulnerable to spreadsheet formula injection from scraped titles.
+- A network error halfway through a crawl threw away every page already scraped; the pages collected so far are now saved (exit code 1, with a warning).
+- Titles with accents or curly quotes could crash the program on a Windows console/pipe using a legacy code page.
+- CSV files showed garbled accents (`CafÃ©`) when opened in Excel on Windows; they are now written with a UTF-8 BOM.
+- Excel export crashed on scraped text containing control characters.
+- A locked or unwritable output file or history database produced a Python traceback instead of a clear error.
+- `urllib3>=1.26` is now declared (older versions don't support the retry settings used).
 - `robots.txt` fetches now go through the rate limiter, like every other request.
 
 ## [1.0.0]

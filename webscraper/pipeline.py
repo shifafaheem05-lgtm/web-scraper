@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from .crawl import Fetch, crawl, discover_categories, enrich, resolve_categories
+from .exceptions import WebScraperError
 from .filters import Filters, sort_books
 from .models import Book
 
@@ -43,6 +44,7 @@ class ScrapeResult:
     kept: List[Book]                                              # after filters / sort / limit
     failures: List[Tuple[str, str]] = field(default_factory=list)
     interrupted: bool = False
+    incomplete: bool = False        # a page failed mid-crawl; results are what was collected before it
 
 
 def site_index(url: str) -> str:
@@ -65,18 +67,27 @@ def run(options: ScrapeOptions, fetch: Fetch) -> ScrapeResult:
     def on_page(n: int, url: str, count: int) -> None:
         log.info("Page %d: %d books  (%s)", n, count, url)
 
+    errors: List[WebScraperError] = []
     try:
         for start in start_urls:
-            for book in crawl(fetch, start, options.max_pages, on_page=on_page):
-                unique.setdefault(book.url, book)
+            try:
+                for book in crawl(fetch, start, options.max_pages, on_page=on_page):
+                    unique.setdefault(book.url, book)
+            except WebScraperError as exc:   # e.g. the connection drops on page 17: keep pages 1-16
+                log.warning("stopped crawling %s: %s", start, exc)
+                errors.append(exc)
     except KeyboardInterrupt:
         interrupted = True
         log.warning("interrupted - keeping the %d books found so far", len(unique))
+
+    if errors and not unique:
+        raise errors[0]          # nothing at all was scraped: that is an error, not a partial result
 
     books = list(unique.values())
     failures: List[Tuple[str, str]] = []
     if options.details and books and not interrupted:
         step = max(len(books) // 10, 1)
+        log.info("Fetching details for %d books (polite delay applies; Ctrl+C keeps what is done)", len(books))
 
         def progress(done: int, total: int) -> None:
             if done == total or done % step == 0:
@@ -89,4 +100,4 @@ def run(options: ScrapeOptions, fetch: Fetch) -> ScrapeResult:
     kept = sort_books(kept, options.sort, options.descending)
     if options.limit is not None:
         kept = kept[: max(options.limit, 0)]
-    return ScrapeResult(books, kept, failures, interrupted)
+    return ScrapeResult(books, kept, failures, interrupted, incomplete=bool(errors))

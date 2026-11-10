@@ -3,7 +3,7 @@
 [![CI](https://github.com/shifafaheem05-lgtm/web-scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/shifafaheem05-lgtm/web-scraper/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-95%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-104%20passing-brightgreen)
 ![Typed](https://img.shields.io/badge/typed-mypy%20strict-informational)
 
 A polite, fast and well-tested Python web scraper that collects book data from [books.toscrape.com](https://books.toscrape.com/) (a site built for practising scraping). It crawls the catalogue, visits every book's own page, filters and sorts the results, and exports them to **CSV, JSON, JSON Lines, SQLite, Excel or a self-contained HTML report** – and it can remember every run so you can see **price and stock changes over time**.
@@ -39,7 +39,7 @@ It is usable as a **command-line tool** and as a **Python library**.
 - Fixes the classic encoding bug (`£51.77`, not `Â£51.77`).
 - `Ctrl+C` stops cleanly and **saves the partial results**.
 - Safe exports: spreadsheet formula injection is neutralised, and the HTML report escapes all scraped text and blocks `javascript:` links.
-- **95 automated tests** (97% coverage) – unit tests plus integration tests against a local fake copy of the site, so they need no internet. Type-checked with `mypy --strict`, linted with `ruff`, CI on Linux and Windows for Python 3.9–3.13.
+- **104 automated tests** (97% coverage) – unit tests plus integration tests against a local fake copy of the site, so they need no internet. Type-checked with `mypy --strict`, linted with `ruff`, CI on Linux and Windows for Python 3.9–3.13.
 
 ## Install
 
@@ -182,7 +182,7 @@ flowchart LR
 | `cli.py` | Sub-commands, config file, exit codes |
 
 Design choices worth knowing about:
-- **Network is separated from parsing**, so 95 tests run offline in about ten seconds.
+- **Network is separated from parsing**, so 104 tests run offline in about ten seconds.
 - **Concurrency without impoliteness**: workers hide network latency, but a shared rate limiter still spaces request *starts* by `--delay`.
 - **Failures are data, not crashes**: a bad card or detail page is logged and reported, and the run carries on.
 

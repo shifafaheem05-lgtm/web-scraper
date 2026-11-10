@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -215,6 +216,10 @@ def cmd_scrape(args: argparse.Namespace) -> int:
     if result.interrupted:
         print("\nInterrupted - partial results were saved.", file=sys.stderr)
         return 130
+    if result.incomplete:
+        print("\nWarning: a page could not be fetched, so the results are incomplete (what was found is saved). "
+              "Run again - cached pages are reused.", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -249,7 +254,17 @@ def cmd_history(args: argparse.Namespace) -> int:
 HANDLERS = {"scrape": cmd_scrape, "categories": cmd_categories, "stats": cmd_stats, "history": cmd_history}
 
 
+def _make_streams_safe() -> None:
+    """A Windows console (or a pipe) using a legacy code page must not crash on titles like 'Café ’'."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001 - not every stream supports it; that is fine
+            pass
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    _make_streams_safe()
     parser = build_parser()
     raw = _normalize_argv(sys.argv[1:] if argv is None else argv)
 
@@ -279,7 +294,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         _validate(args, parser)
     try:
         return HANDLERS[args.command](args)
-    except WebScraperError as exc:
+    except (WebScraperError, OSError, sqlite3.Error) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
