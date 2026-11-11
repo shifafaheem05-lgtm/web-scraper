@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Web Scraper Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: one calm column. Header and sample-data notice, one run's results (tiles, charts, searchable table), then the commands to reproduce it. */
+:root{
+  --bg:#f6f7f5; --surface:#ffffff; --fg:#17201f; --muted:#5d6967; --line:#dde2df;
+  --accent:#1f6f69; --accent-soft:#e1f0ee; --warn-bg:#fbf1da; --warn-fg:#6b4a05; --code-bg:#eef1ef;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101615; --surface:#171f1e; --fg:#e8eeec; --muted:#9aa8a5; --line:#2a3634;
+  --accent:#5cc0b6; --accent-soft:#16312e; --warn-bg:#33290f; --warn-fg:#f0d28a; --code-bg:#1d2826; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101615; --surface:#171f1e; --fg:#e8eeec; --muted:#9aa8a5; --line:#2a3634;
+  --accent:#5cc0b6; --accent-soft:#16312e; --warn-bg:#33290f; --warn-fg:#f0d28a; --code-bg:#1d2826; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body);padding-block:32px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+.eyebrow{font:500 .78rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+h1{font:700 clamp(2rem,5vw,3rem)/1.05 var(--display);margin:0 0 12px;text-wrap:balance}
+h2{font:600 1.25rem/1.2 var(--display);margin:0 0 4px}
+h3{font:600 .95rem/1.2 var(--display);margin:0 0 10px}
+p{margin:0}.lead{max-width:62ch;color:var(--muted);font-size:1.05rem}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.btn{display:inline-block;padding:9px 16px;border-radius:8px;font-weight:600;text-decoration:none;border:1px solid var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--bg)}
+.btn:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,th:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.notice{background:var(--warn-bg);color:var(--warn-fg);border-radius:8px;padding:12px 16px;font-size:.92rem}
+.notice b{font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.tile b{display:block;font:600 1.6rem/1.2 var(--display);font-variant-numeric:tabular-nums}
+.tile span{color:var(--muted);font-size:.85rem}
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.bar{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.85rem}
+.bar em{flex:0 0 74px;font-style:normal;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{flex:1;min-width:0}.bar i{display:block;height:10px;background:var(--accent);border-radius:3px;min-width:2px}
+.bar span{flex:0 0 28px;text-align:right;font-variant-numeric:tabular-nums}
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 10px}
+input,select{padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font:inherit}
+input{flex:1 1 220px;min-width:0}
+.count{color:var(--muted);font-size:.85rem;align-self:center;font-variant-numeric:tabular-nums}
+.wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:560px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface);cursor:pointer;user-select:none;color:var(--muted);font:500 .75rem/1.2 var(--mono);text-transform:uppercase;letter-spacing:.05em}
+th[aria-sort="ascending"]::after{content:" ▲"}th[aria-sort="descending"]::after{content:" ▼"}
+td.t{white-space:normal;min-width:200px}
+.steps{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.cmd{display:flex;align-items:flex-start;gap:10px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.cmd code{flex:1;min-width:0;font:400 .85rem/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.cmd button{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;padding:4px 10px;font:500 .78rem var(--body);cursor:pointer}
+.label{font-size:.85rem;color:var(--muted);margin-bottom:4px}
+footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:16px}
+a{color:var(--accent)}
+@media (prefers-reduced-motion:no-preference){.btn{transition:opacity .15s}.btn:hover{opacity:.85}}
+</style>
+
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Live demo · sample data</p>
+    <h1>Web Scraper</h1>
+    <p class="lead">A polite Python scraper and CLI. This is the report it writes after crawling a catalogue, visiting every book's page and exporting the results. Search, filter and sort it below.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/shifafaheem05-lgtm/web-scraper" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn" href="#run-it">Run it yourself</a>
+    </div>
+  </header>
+
+  <p class="notice"><b>Sample data.</b> These books were generated by the project's test site, which copies the page structure of books.toscrape.com. They are not real listings. Run the commands at the bottom to get real results.</p>
+
+  <section aria-labelledby="results">
+    <h2 id="results">One run, 72 books</h2>
+    <p class="lead" style="margin-bottom:14px">Scraped with <code>--all-pages --details</code>: every field below comes from the book's own page.</p>
+    <div class="tiles"><div class="tile"><b>72</b><span>books scraped</span></div><div class="tile"><b>£32.01</b><span>average price</span></div><div class="tile"><b>£31.59</b><span>median price</span></div><div class="tile"><b>60</b><span>in stock</span></div><div class="tile"><b>6</b><span>categories</span></div></div>
+  </section>
+
+  <section class="panels" aria-label="Charts">
+    <div class="panel"><h3>Ratings</h3><div class="bar"><em>1 star</em><div class="track"><i style="width:100%"></i></div><span>15</span></div><div class="bar"><em>2 star</em><div class="track"><i style="width:100%"></i></div><span>15</span></div><div class="bar"><em>3 star</em><div class="track"><i style="width:93%"></i></div><span>14</span></div><div class="bar"><em>4 star</em><div class="track"><i style="width:93%"></i></div><span>14</span></div><div class="bar"><em>5 star</em><div class="track"><i style="width:93%"></i></div><span>14</span></div></div>
+    <div class="panel"><h3>Price distribution (£)</h3><div class="bar"><em>10-20</em><div class="track"><i style="width:94%"></i></div><span>16</span></div><div class="bar"><em>20-30</em><div class="track"><i style="width:100%"></i></div><span>17</span></div><div class="bar"><em>30-40</em><div class="track"><i style="width:100%"></i></div><span>17</span></div><div class="bar"><em>40-50</em><div class="track"><i style="width:82%"></i></div><span>14</span></div><div class="bar"><em>50-60</em><div class="track"><i style="width:47%"></i></div><span>8</span></div></div>
+    <div class="panel"><h3>Books per category</h3><div class="bar"><em>Fiction</em><div class="track"><i style="width:100%"></i></div><span>12</span></div><div class="bar"><em>History</em><div class="track"><i style="width:100%"></i></div><span>12</span></div><div class="bar"><em>Mystery</em><div class="track"><i style="width:100%"></i></div><span>12</span></div><div class="bar"><em>Poetry</em><div class="track"><i style="width:100%"></i></div><span>12</span></div><div class="bar"><em>Science</em><div class="track"><i style="width:100%"></i></div><span>12</span></div><div class="bar"><em>Travel</em><div class="track"><i style="width:100%"></i></div><span>12</span></div></div>
+  </section>
+
+  <section aria-labelledby="table-h">
+    <h2 id="table-h">Browse the results</h2>
+    <div class="controls">
+      <input id="q" type="search" placeholder="Search title, category or UPC" aria-label="Search books">
+      <select id="cat" aria-label="Filter by category"><option value="">All categories</option><option>Fiction</option><option>History</option><option>Mystery</option><option>Poetry</option><option>Science</option><option>Travel</option></select>
+      <select id="stock" aria-label="Filter by stock"><option value="">Any stock</option><option value="yes">In stock</option><option value="no">Out of stock</option></select>
+      <span class="count" id="count" aria-live="polite"></span>
+    </div>
+    <div class="wrap"><table><thead><tr><th data-n="0" scope="col">Title</th><th data-n="0" scope="col">Category</th><th data-n="1" scope="col">Price £</th><th data-n="1" scope="col">Rating</th><th data-n="0" scope="col">In stock</th><th data-n="1" scope="col">Stock</th><th data-n="1" scope="col">Reviews</th><th data-n="0" scope="col">UPC</th></tr></thead><tbody id="rows"><tr><td class=t data-v="light story 1">Light Story 1</td><td data-v="travel">Travel</td><td data-v="10.00">10.00</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="3">3</td><td data-v="1">1</td><td data-v="upc0001">upc0001</td></tr><tr><td class=t data-v="garden story 38">Garden Story 38</td><td data-v="mystery">Mystery</td><td data-v="10.47">10.47</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="20">20</td><td data-v="2">2</td><td data-v="upc0038">upc0038</td></tr><tr><td class=t data-v="velvet story 32">Velvet Story 32</td><td data-v="mystery">Mystery</td><td data-v="11.61">11.61</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="14">14</td><td data-v="0">0</td><td data-v="upc0032">upc0032</td></tr><tr><td class=t data-v="shadow story 69">Shadow Story 69</td><td data-v="poetry">Poetry</td><td data-v="12.08">12.08</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="11">11</td><td data-v="1">1</td><td data-v="upc0069">upc0069</td></tr><tr><td class=t data-v="mesaerion story 26">Mesaerion Story 26</td><td data-v="mystery">Mystery</td><td data-v="12.75">12.75</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="8">8</td><td data-v="2">2</td><td data-v="upc0026">upc0026</td></tr><tr><td class=t data-v="soumission story 63">Soumission Story 63</td><td data-v="poetry">Poetry</td><td data-v="13.22">13.22</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="5">5</td><td data-v="3">3</td><td data-v="upc0063">upc0063</td></tr><tr><td class=t data-v="harbor story 20">Harbor Story 20</td><td data-v="mystery">Mystery</td><td data-v="13.89">13.89</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="22">22</td><td data-v="0">0</td><td data-v="upc0020">upc0020</td></tr><tr><td class=t data-v="himalayas story 57">Himalayas Story 57</td><td data-v="poetry">Poetry</td><td data-v="14.36">14.36</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="19">19</td><td data-v="1">1</td><td data-v="upc0057">upc0057</td></tr><tr><td class=t data-v="objects story 14">Objects Story 14</td><td data-v="mystery">Mystery</td><td data-v="15.03">15.03</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="16">16</td><td data-v="2">2</td><td data-v="upc0014">upc0014</td></tr><tr><td class=t data-v="light story 51">Light Story 51</td><td data-v="poetry">Poetry</td><td data-v="15.50">15.50</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="13">13</td><td data-v="3">3</td><td data-v="upc0051">upc0051</td></tr><tr><td class=t data-v="garden story 8">Garden Story 8</td><td data-v="mystery">Mystery</td><td data-v="16.17">16.17</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="10">10</td><td data-v="0">0</td><td data-v="upc0008">upc0008</td></tr><tr><td class=t data-v="attic story 45">Attic Story 45</td><td data-v="poetry">Poetry</td><td data-v="16.64">16.64</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="7">7</td><td data-v="1">1</td><td data-v="upc0045">upc0045</td></tr><tr><td class=t data-v="velvet story 2">Velvet Story 2</td><td data-v="mystery">Mystery</td><td data-v="17.31">17.31</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="4">4</td><td data-v="2">2</td><td data-v="upc0002">upc0002</td></tr><tr><td class=t data-v="shadow story 39">Shadow Story 39</td><td data-v="poetry">Poetry</td><td data-v="17.78">17.78</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="21">21</td><td data-v="3">3</td><td data-v="upc0039">upc0039</td></tr><tr><td class=t data-v="soumission story 33">Soumission Story 33</td><td data-v="poetry">Poetry</td><td data-v="18.92">18.92</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="15">15</td><td data-v="1">1</td><td data-v="upc0033">upc0033</td></tr><tr><td class=t data-v="harbor story 70">Harbor Story 70</td><td data-v="fiction">Fiction</td><td data-v="19.39">19.39</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="12">12</td><td data-v="2">2</td><td data-v="upc0070">upc0070</td></tr><tr><td class=t data-v="himalayas story 27">Himalayas Story 27</td><td data-v="poetry">Poetry</td><td data-v="20.06">20.06</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="9">9</td><td data-v="3">3</td><td data-v="upc0027">upc0027</td></tr><tr><td class=t data-v="objects story 64">Objects Story 64</td><td data-v="fiction">Fiction</td><td data-v="20.53">20.53</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="6">6</td><td data-v="0">0</td><td data-v="upc0064">upc0064</td></tr><tr><td class=t data-v="light story 21">Light Story 21</td><td data-v="poetry">Poetry</td><td data-v="21.20">21.20</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="3">3</td><td data-v="1">1</td><td data-v="upc0021">upc0021</td></tr><tr><td class=t data-v="garden story 58">Garden Story 58</td><td data-v="fiction">Fiction</td><td data-v="21.67">21.67</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="20">20</td><td data-v="2">2</td><td data-v="upc0058">upc0058</td></tr><tr><td class=t data-v="attic story 15">Attic Story 15</td><td data-v="poetry">Poetry</td><td data-v="22.34">22.34</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="17">17</td><td data-v="3">3</td><td data-v="upc0015">upc0015</td></tr><tr><td class=t data-v="velvet story 52">Velvet Story 52</td><td data-v="fiction">Fiction</td><td data-v="22.81">22.81</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="14">14</td><td data-v="0">0</td><td data-v="upc0052">upc0052</td></tr><tr><td class=t data-v="shadow story 9">Shadow Story 9</td><td data-v="poetry">Poetry</td><td data-v="23.48">23.48</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="11">11</td><td data-v="1">1</td><td data-v="upc0009">upc0009</td></tr><tr><td class=t data-v="mesaerion story 46">Mesaerion Story 46</td><td data-v="fiction">Fiction</td><td data-v="23.95">23.95</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="8">8</td><td data-v="2">2</td><td data-v="upc0046">upc0046</td></tr><tr><td class=t data-v="soumission story 3">Soumission Story 3</td><td data-v="poetry">Poetry</td><td data-v="24.62">24.62</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="5">5</td><td data-v="3">3</td><td data-v="upc0003">upc0003</td></tr><tr><td class=t data-v="harbor story 40">Harbor Story 40</td><td data-v="fiction">Fiction</td><td data-v="25.09">25.09</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="22">22</td><td data-v="0">0</td><td data-v="upc0040">upc0040</td></tr><tr><td class=t data-v="objects story 34">Objects Story 34</td><td data-v="fiction">Fiction</td><td data-v="26.23">26.23</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="16">16</td><td data-v="2">2</td><td data-v="upc0034">upc0034</td></tr><tr><td class=t data-v="light story 71">Light Story 71</td><td data-v="science">Science</td><td data-v="26.70">26.70</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="13">13</td><td data-v="3">3</td><td data-v="upc0071">upc0071</td></tr><tr><td class=t data-v="garden story 28">Garden Story 28</td><td data-v="fiction">Fiction</td><td data-v="27.37">27.37</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="10">10</td><td data-v="0">0</td><td data-v="upc0028">upc0028</td></tr><tr><td class=t data-v="attic story 65">Attic Story 65</td><td data-v="science">Science</td><td data-v="27.84">27.84</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="7">7</td><td data-v="1">1</td><td data-v="upc0065">upc0065</td></tr><tr><td class=t data-v="velvet story 22">Velvet Story 22</td><td data-v="fiction">Fiction</td><td data-v="28.51">28.51</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="4">4</td><td data-v="2">2</td><td data-v="upc0022">upc0022</td></tr><tr><td class=t data-v="shadow story 59">Shadow Story 59</td><td data-v="science">Science</td><td data-v="28.98">28.98</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="21">21</td><td data-v="3">3</td><td data-v="upc0059">upc0059</td></tr><tr><td class=t data-v="mesaerion story 16">Mesaerion Story 16</td><td data-v="fiction">Fiction</td><td data-v="29.65">29.65</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="18">18</td><td data-v="0">0</td><td data-v="upc0016">upc0016</td></tr><tr><td class=t data-v="soumission story 53">Soumission Story 53</td><td data-v="science">Science</td><td data-v="30.12">30.12</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="15">15</td><td data-v="1">1</td><td data-v="upc0053">upc0053</td></tr><tr><td class=t data-v="harbor story 10">Harbor Story 10</td><td data-v="fiction">Fiction</td><td data-v="30.79">30.79</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="12">12</td><td data-v="2">2</td><td data-v="upc0010">upc0010</td></tr><tr><td class=t data-v="himalayas story 47">Himalayas Story 47</td><td data-v="science">Science</td><td data-v="31.26">31.26</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="9">9</td><td data-v="3">3</td><td data-v="upc0047">upc0047</td></tr><tr><td class=t data-v="objects story 4">Objects Story 4</td><td data-v="fiction">Fiction</td><td data-v="31.93">31.93</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="6">6</td><td data-v="0">0</td><td data-v="upc0004">upc0004</td></tr><tr><td class=t data-v="light story 41">Light Story 41</td><td data-v="science">Science</td><td data-v="32.40">32.40</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="3">3</td><td data-v="1">1</td><td data-v="upc0041">upc0041</td></tr><tr><td class=t data-v="attic story 35">Attic Story 35</td><td data-v="science">Science</td><td data-v="33.54">33.54</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="17">17</td><td data-v="3">3</td><td data-v="upc0035">upc0035</td></tr><tr><td class=t data-v="velvet story 72">Velvet Story 72</td><td data-v="history">History</td><td data-v="34.01">34.01</td><td data-v="2">★★☆☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="0">0</td><td data-v="upc0072">upc0072</td></tr><tr><td class=t data-v="shadow story 29">Shadow Story 29</td><td data-v="science">Science</td><td data-v="34.68">34.68</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="11">11</td><td data-v="1">1</td><td data-v="upc0029">upc0029</td></tr><tr><td class=t data-v="mesaerion story 66">Mesaerion Story 66</td><td data-v="history">History</td><td data-v="35.15">35.15</td><td data-v="1">★☆☆☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="2">2</td><td data-v="upc0066">upc0066</td></tr><tr><td class=t data-v="soumission story 23">Soumission Story 23</td><td data-v="science">Science</td><td data-v="35.82">35.82</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="5">5</td><td data-v="3">3</td><td data-v="upc0023">upc0023</td></tr><tr><td class=t data-v="harbor story 60">Harbor Story 60</td><td data-v="history">History</td><td data-v="36.29">36.29</td><td data-v="5">★★★★★</td><td data-v="no">no</td><td data-v=""></td><td data-v="0">0</td><td data-v="upc0060">upc0060</td></tr><tr><td class=t data-v="himalayas story 17">Himalayas Story 17</td><td data-v="science">Science</td><td data-v="36.96">36.96</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="19">19</td><td data-v="1">1</td><td data-v="upc0017">upc0017</td></tr><tr><td class=t data-v="objects story 54">Objects Story 54</td><td data-v="history">History</td><td data-v="37.43">37.43</td><td data-v="4">★★★★☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="2">2</td><td data-v="upc0054">upc0054</td></tr><tr><td class=t data-v="light story 11">Light Story 11</td><td data-v="science">Science</td><td data-v="38.10">38.10</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="13">13</td><td data-v="3">3</td><td data-v="upc0011">upc0011</td></tr><tr><td class=t data-v="garden story 48">Garden Story 48</td><td data-v="history">History</td><td data-v="38.57">38.57</td><td data-v="3">★★★☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="0">0</td><td data-v="upc0048">upc0048</td></tr><tr><td class=t data-v="attic story 5">Attic Story 5</td><td data-v="science">Science</td><td data-v="39.24">39.24</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="7">7</td><td data-v="1">1</td><td data-v="upc0005">upc0005</td></tr><tr><td class=t data-v="velvet story 42">Velvet Story 42</td><td data-v="history">History</td><td data-v="39.71">39.71</td><td data-v="2">★★☆☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="2">2</td><td data-v="upc0042">upc0042</td></tr><tr><td class=t data-v="mesaerion story 36">Mesaerion Story 36</td><td data-v="history">History</td><td data-v="40.85">40.85</td><td data-v="1">★☆☆☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="0">0</td><td data-v="upc0036">upc0036</td></tr><tr><td class=t data-v="harbor story 30">Harbor Story 30</td><td data-v="history">History</td><td data-v="41.99">41.99</td><td data-v="5">★★★★★</td><td data-v="no">no</td><td data-v=""></td><td data-v="2">2</td><td data-v="upc0030">upc0030</td></tr><tr><td class=t data-v="himalayas story 67">Himalayas Story 67</td><td data-v="travel">Travel</td><td data-v="42.46">42.46</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="9">9</td><td data-v="3">3</td><td data-v="upc0067">upc0067</td></tr><tr><td class=t data-v="objects story 24">Objects Story 24</td><td data-v="history">History</td><td data-v="43.13">43.13</td><td data-v="4">★★★★☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="0">0</td><td data-v="upc0024">upc0024</td></tr><tr><td class=t data-v="light story 61">Light Story 61</td><td data-v="travel">Travel</td><td data-v="43.60">43.60</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="3">3</td><td data-v="1">1</td><td data-v="upc0061">upc0061</td></tr><tr><td class=t data-v="garden story 18">Garden Story 18</td><td data-v="history">History</td><td data-v="44.27">44.27</td><td data-v="3">★★★☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="2">2</td><td data-v="upc0018">upc0018</td></tr><tr><td class=t data-v="attic story 55">Attic Story 55</td><td data-v="travel">Travel</td><td data-v="44.74">44.74</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="17">17</td><td data-v="3">3</td><td data-v="upc0055">upc0055</td></tr><tr><td class=t data-v="velvet story 12">Velvet Story 12</td><td data-v="history">History</td><td data-v="45.41">45.41</td><td data-v="2">★★☆☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="0">0</td><td data-v="upc0012">upc0012</td></tr><tr><td class=t data-v="shadow story 49">Shadow Story 49</td><td data-v="travel">Travel</td><td data-v="45.88">45.88</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="11">11</td><td data-v="1">1</td><td data-v="upc0049">upc0049</td></tr><tr><td class=t data-v="mesaerion story 6">Mesaerion Story 6</td><td data-v="history">History</td><td data-v="46.55">46.55</td><td data-v="1">★☆☆☆☆</td><td data-v="no">no</td><td data-v=""></td><td data-v="2">2</td><td data-v="upc0006">upc0006</td></tr><tr><td class=t data-v="soumission story 43">Soumission Story 43</td><td data-v="travel">Travel</td><td data-v="47.02">47.02</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="5">5</td><td data-v="3">3</td><td data-v="upc0043">upc0043</td></tr><tr><td class=t data-v="himalayas story 37">Himalayas Story 37</td><td data-v="travel">Travel</td><td data-v="48.16">48.16</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="19">19</td><td data-v="1">1</td><td data-v="upc0037">upc0037</td></tr><tr><td class=t data-v="light story 31">Light Story 31</td><td data-v="travel">Travel</td><td data-v="49.30">49.30</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="13">13</td><td data-v="3">3</td><td data-v="upc0031">upc0031</td></tr><tr><td class=t data-v="garden story 68">Garden Story 68</td><td data-v="mystery">Mystery</td><td data-v="49.77">49.77</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="10">10</td><td data-v="0">0</td><td data-v="upc0068">upc0068</td></tr><tr><td class=t data-v="attic story 25">Attic Story 25</td><td data-v="travel">Travel</td><td data-v="50.44">50.44</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="7">7</td><td data-v="1">1</td><td data-v="upc0025">upc0025</td></tr><tr><td class=t data-v="velvet story 62">Velvet Story 62</td><td data-v="mystery">Mystery</td><td data-v="50.91">50.91</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="4">4</td><td data-v="2">2</td><td data-v="upc0062">upc0062</td></tr><tr><td class=t data-v="shadow story 19">Shadow Story 19</td><td data-v="travel">Travel</td><td data-v="51.58">51.58</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="21">21</td><td data-v="3">3</td><td data-v="upc0019">upc0019</td></tr><tr><td class=t data-v="mesaerion story 56">Mesaerion Story 56</td><td data-v="mystery">Mystery</td><td data-v="52.05">52.05</td><td data-v="1">★☆☆☆☆</td><td data-v="yes">yes</td><td data-v="18">18</td><td data-v="0">0</td><td data-v="upc0056">upc0056</td></tr><tr><td class=t data-v="soumission story 13">Soumission Story 13</td><td data-v="travel">Travel</td><td data-v="52.72">52.72</td><td data-v="3">★★★☆☆</td><td data-v="yes">yes</td><td data-v="15">15</td><td data-v="1">1</td><td data-v="upc0013">upc0013</td></tr><tr><td class=t data-v="harbor story 50">Harbor Story 50</td><td data-v="mystery">Mystery</td><td data-v="53.19">53.19</td><td data-v="5">★★★★★</td><td data-v="yes">yes</td><td data-v="12">12</td><td data-v="2">2</td><td data-v="upc0050">upc0050</td></tr><tr><td class=t data-v="himalayas story 7">Himalayas Story 7</td><td data-v="travel">Travel</td><td data-v="53.86">53.86</td><td data-v="2">★★☆☆☆</td><td data-v="yes">yes</td><td data-v="9">9</td><td data-v="3">3</td><td data-v="upc0007">upc0007</td></tr><tr><td class=t data-v="objects story 44">Objects Story 44</td><td data-v="mystery">Mystery</td><td data-v="54.33">54.33</td><td data-v="4">★★★★☆</td><td data-v="yes">yes</td><td data-v="6">6</td><td data-v="0">0</td><td data-v="upc0044">upc0044</td></tr></tbody></table></div>
+  </section>
+
+  <section id="run-it" aria-labelledby="run-h">
+    <h2 id="run-h">Run it yourself</h2>
+    <p class="lead">Python 3.9 or newer. The scraper obeys robots.txt and waits between requests.</p>
+    <div class="steps">
+      <div><p class="label">1. Install</p><div class="cmd"><code>git clone https://github.com/shifafaheem05-lgtm/web-scraper.git
+cd web-scraper
+pip install -e ".[excel]"</code><button type="button">Copy</button></div></div>
+      <div><p class="label">2. Scrape with details and write a report like this one</p><div class="cmd"><code>webscraper scrape --max-pages 2 --details -o output/books.csv -o output/report.html</code><button type="button">Copy</button></div></div>
+      <div><p class="label">3. Track price changes between runs</p><div class="cmd"><code>webscraper scrape --all-pages --db output/history.db
+webscraper history --db output/history.db "attic"</code><button type="button">Copy</button></div></div>
+    </div>
+  </section>
+
+  <footer>Built by Shifa Faheem · MIT License · CSV, JSON, JSONL, SQLite, Excel and HTML export · 104 automated tests</footer>
+</main>
+
+<script>
+(function () {
+  var q = document.getElementById('q'), cat = document.getElementById('cat'), stock = document.getElementById('stock');
+  var body = document.getElementById('rows'), count = document.getElementById('count');
+  var rows = Array.prototype.slice.call(body.rows), total = rows.length;
+  function apply() {
+    var s = q.value.toLowerCase(), c = cat.value.toLowerCase(), st = stock.value, shown = 0;
+    rows.forEach(function (r) {
+      var ok = (!s || r.textContent.toLowerCase().indexOf(s) > -1) &&
+               (!c || r.cells[1].dataset.v === c) && (!st || r.cells[4].dataset.v === st);
+      r.hidden = !ok; if (ok) shown++;
+    });
+    count.textContent = shown + ' of ' + total + ' books';
+  }
+  [q, cat, stock].forEach(function (el) { el.addEventListener('input', apply); });
+  apply();
+
+  var heads = document.querySelectorAll('th');
+  heads.forEach(function (th, i) {
+    th.tabIndex = 0;
+    function sort() {
+      var asc = th.getAttribute('aria-sort') !== 'ascending', num = th.dataset.n === '1';
+      heads.forEach(function (h) { h.removeAttribute('aria-sort'); });
+      th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+      rows.sort(function (a, b) {
+        var x = a.cells[i].dataset.v, y = b.cells[i].dataset.v;
+        var d = num ? (parseFloat(x || 0) - parseFloat(y || 0)) : x.localeCompare(y);
+        return asc ? d : -d;
+      });
+      rows.forEach(function (r) { body.appendChild(r); });
+    }
+    th.addEventListener('click', sort);
+    th.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sort(); } });
+  });
+
+  document.querySelectorAll('.cmd button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var code = btn.parentNode.querySelector('code');
+      function done(msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); }
+      function fallback() {
+        var range = document.createRange(); range.selectNodeContents(code);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); done('Selected');
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code.textContent).then(function () { done('Copied'); }, fallback);
+      } else { fallback(); }
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

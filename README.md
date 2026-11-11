@@ -1,5 +1,7 @@
 # Web Scraper
 
+**[▶ Live demo (sample report)](https://shifafaheem05-lgtm.github.io/web-scraper/)**
+
 [![CI](https://github.com/shifafaheem05-lgtm/web-scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/shifafaheem05-lgtm/web-scraper/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
