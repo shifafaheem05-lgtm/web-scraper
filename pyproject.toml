@@ -50,7 +50,7 @@ version = { attr = "webscraper.__version__" }
 include = ["webscraper*"]
 
 [tool.setuptools.package-data]
-webscraper = ["py.typed"]
+webscraper = ["py.typed", "templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

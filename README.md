@@ -5,7 +5,7 @@
 [![CI](https://github.com/shifafaheem05-lgtm/web-scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/shifafaheem05-lgtm/web-scraper/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-104%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-132%20passing-brightgreen)
 ![Typed](https://img.shields.io/badge/typed-mypy%20strict-informational)
 
 A polite, fast and well-tested Python web scraper that collects book data from [books.toscrape.com](https://books.toscrape.com/) (a site built for practising scraping). It crawls the catalogue, visits every book's own page, filters and sorts the results, and exports them to **CSV, JSON, JSON Lines, SQLite, Excel or a self-contained HTML report** – and it can remember every run so you can see **price and stock changes over time**.
@@ -15,6 +15,7 @@ It is usable as a **command-line tool** and as a **Python library**.
 ## Features
 
 **Scraping**
+- **Multiple sites** – a small adapter system (`--site books|quotes`, see `webscraper sites`). The second built-in site, quotes.toscrape.com, shows how little code a new site needs.
 - **Multi-page crawling** – follows "next" links, with a page limit (`--max-pages`) or `--all-pages`.
 - **Category scraping** – `--category Mystery`, several categories, or `--all-categories`. Typos get suggestions ("Did you mean: Mystery?").
 - **Detail pages** (`--details`) – category, UPC, description, stock count, review count, product type, price excl./incl. tax.
@@ -41,7 +42,7 @@ It is usable as a **command-line tool** and as a **Python library**.
 - Fixes the classic encoding bug (`£51.77`, not `Â£51.77`).
 - `Ctrl+C` stops cleanly and **saves the partial results**.
 - Safe exports: spreadsheet formula injection is neutralised, and the HTML report escapes all scraped text and blocks `javascript:` links.
-- **104 automated tests** (97% coverage) – unit tests plus integration tests against a local fake copy of the site, so they need no internet. Type-checked with `mypy --strict`, linted with `ruff`, CI on Linux and Windows for Python 3.9–3.13.
+- **132 automated tests** (97% coverage) – unit tests plus integration tests against a local fake copy of the site, so they need no internet. Type-checked with `mypy --strict`, linted with `ruff`, CI on Linux and Windows for Python 3.9–3.13.
 
 ## Install
 
@@ -88,6 +89,14 @@ webscraper history --db output/history.db "light in the attic"
 # Summarise a file you already exported
 webscraper stats output/books.csv
 
+# A different site: quotes with authors and tags
+webscraper sites
+webscraper scrape --site quotes --all-pages --search love --sort author -o output/quotes.csv
+
+# Turn your own scrape into a public demo page (for GitHub Pages: docs/index.html)
+webscraper scrape --all-pages --details -o output/books.csv
+webscraper demo output/books.csv -o docs/index.html
+
 # Use a config file (command-line options override it)
 webscraper scrape --config examples/webscraper.toml
 ```
@@ -110,6 +119,7 @@ webscraper scrape --config examples/webscraper.toml
 | `--format FMT` | Force a format instead of using the extension | from extension |
 | `--db FILE` | Record the run and report changes since the last one | off |
 | `--config FILE` | TOML file with default options | – |
+| `--site NAME` | Website to scrape: `books` or `quotes` | books |
 | `--delay S` | Minimum seconds between requests | 1.0 |
 | `--timeout S` / `--retries N` | Request timeout / retries on temporary errors | 15 / 3 |
 | `--user-agent` / `--proxy` | Custom User-Agent / proxy URL | built in / none |
@@ -165,7 +175,7 @@ flowchart LR
     H --> RL[rate limiter]
     H --> RB[robots.txt]
     H --> CA[disk cache]
-    C --> PA[parse: HTML to Book]
+    C --> PA[sites: parsing rules per website]
     P --> E[enrich: detail pages, thread pool]
     P --> F[filters + sort + limit]
     F --> X[export: csv / json / jsonl / sqlite / xlsx / html]
@@ -176,6 +186,8 @@ flowchart LR
 |---|---|
 | `client.py` | Polite HTTP: User-Agent, retries, robots.txt, cache, thread-safe rate limiting |
 | `parse.py` | Pure functions, HTML → `Book` (no network, easy to test) |
+| `sites/` | One adapter per website (`books`, `quotes`): how to read a page and find the next one |
+| `demo.py` | Builds the public demo page from a scraped file |
 | `crawl.py` | Pagination, category discovery, concurrent detail fetching |
 | `pipeline.py` | The whole run as one function, usable as a library |
 | `filters.py`, `stats.py` | Filtering/sorting, summary statistics |
@@ -184,9 +196,17 @@ flowchart LR
 | `cli.py` | Sub-commands, config file, exit codes |
 
 Design choices worth knowing about:
-- **Network is separated from parsing**, so 104 tests run offline in about ten seconds.
+- **Network is separated from parsing**, so 132 tests run offline in about ten seconds.
 - **Concurrency without impoliteness**: workers hide network latency, but a shared rate limiter still spaces request *starts* by `--delay`.
 - **Failures are data, not crashes**: a bad card or detail page is logged and reported, and the run carries on.
+
+## Adding a new website
+
+1. Write `parse_listing(html, page_url) -> list of items` and `find_next(html, page_url) -> url or None` (see `webscraper/sites/quotes.py`, about 40 lines).
+2. Describe the item as a dataclass with an `as_dict()` method.
+3. Create a `Site(...)` and add it to `SITES` in `webscraper/sites/__init__.py`.
+
+Crawling, politeness, caching, retries, filtering, sorting and every export format then work for the new site with no other changes. Add a fake copy of the site under `tests/` (see `tests/fakequotes.py`) so the tests need no internet.
 
 ## Development
 
@@ -207,12 +227,12 @@ Only scrape sites you are allowed to. This project targets a practice website. F
 
 ## Limitations
 
-- The selectors are written for books.toscrape.com. Other sites need new selectors in `parse.py`.
+- Two sites are built in (books.toscrape.com and quotes.toscrape.com). Any other site needs its own adapter (see above). Categories, detail pages, price history and the price/rating filters exist for the books site only.
 - Pages that need JavaScript to show their content would require a browser tool such as Playwright.
 
 ## Roadmap
 
-Pluggable site "adapters" so other sites can be added without touching the core, async I/O (`httpx`), and a scheduled mode that re-runs and notifies on price drops.
+Async I/O (`httpx`), a scheduled mode that re-runs and notifies on price drops, and optional browser rendering (Playwright) for JavaScript-heavy sites.
 
 ## Author
 

@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-11-13
+
+### Added
+- Site adapters (`webscraper/sites/`): the pipeline, exports and CLI are no longer tied to one website. New `--site` option and `sites` command.
+- Second built-in site: quotes.toscrape.com (`--site quotes`) with search, sort and limit, and every export format.
+- `demo` command: builds a self-contained, SEO-ready demo page (meta description, Open Graph tags) from a scraped file, labelled as a real scrape or as sample data.
+- Generic HTML report for non-book items.
+
+### Changed
+- `ScrapeOptions.url` defaults to the chosen site's start page; `crawl()` accepts `parse`/`next_page` functions.
+- `export.save()` accepts `table` and `fields`, so any dataclass items can be exported.
+
 ## [2.0.0] - 2026-11-09
 
 ### Added

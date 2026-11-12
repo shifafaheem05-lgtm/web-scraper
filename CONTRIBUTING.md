@@ -8,4 +8,6 @@ Thanks for your interest! This is a small learning project, but contributions ar
 4. Run `make check` (ruff, mypy, pytest). CI runs the same on Linux and Windows.
 5. Open a pull request describing what changed and why. Add a line to `CHANGELOG.md`.
 
+To support another website, add an adapter under `webscraper/sites/` (see the README section "Adding a new website").
+
 Please keep the scraper polite: no changes that bypass `robots.txt` or the rate limiter by default.

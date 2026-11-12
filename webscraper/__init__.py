@@ -1,5 +1,5 @@
 """A polite, tested, feature-rich web scraper for the books.toscrape.com practice site."""
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 from .crawl import crawl, enrich  # noqa: E402
 from .exceptions import ExportError, FetchError, RobotsDisallowed, ScrapeError, WebScraperError  # noqa: E402

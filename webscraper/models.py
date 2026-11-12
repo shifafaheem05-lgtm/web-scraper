@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
-from typing import Any, Callable, Dict, List, Mapping, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, TypeVar
 
 T = TypeVar("T")
 
@@ -66,6 +66,19 @@ class Book:
 
 
 FIELDS: List[str] = [f.name for f in fields(Book)]
+
+
+@dataclass(frozen=True)
+class Quote:
+    """One quote from quotes.toscrape.com."""
+
+    text: str
+    author: str
+    tags: Tuple[str, ...] = ()
+    author_url: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)

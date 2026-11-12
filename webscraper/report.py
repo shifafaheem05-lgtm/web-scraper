@@ -91,3 +91,25 @@ def build_html_report(books: Sequence[Book], title: str = "Book scrape report",
             f'<input id="q" type="search" placeholder="Search books..." aria-label="Search books">'
             f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
             f"</main><script>{_JS}</script></body></html>")
+
+
+def build_generic_report(items: Sequence[Any], fields: Sequence[str], title: str = "Scrape report") -> str:
+    """A simple searchable table for any kind of item (used for non-book sites)."""
+    esc = html.escape
+    when = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    def text(value: Any) -> str:
+        return "; ".join(map(str, value)) if isinstance(value, (list, tuple)) else ("" if value is None else str(value))
+
+    head = "".join(f'<th data-n="0">{esc(f)}</th>' for f in fields)
+    body = "".join(
+        "<tr>" + "".join(
+            f'<td class="t" data-v="{esc(text(row[f]).lower())}">{esc(text(row[f]))}</td>' for f in fields) + "</tr>"
+        for row in (i.as_dict() for i in items))
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(title)}</title>'
+            f"<style>{_CSS}</style></head><body><main><h1>{esc(title)}</h1>"
+            f'<p class="sub">Generated {when} &middot; {len(items)} items</p>'
+            f'<input id="q" type="search" placeholder="Search..." aria-label="Search">'
+            f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
+            f"</main><script>{_JS}</script></body></html>")

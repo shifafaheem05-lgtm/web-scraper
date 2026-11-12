@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from .crawl import Fetch, crawl, discover_categories, enrich, resolve_categories
 from .exceptions import WebScraperError
-from .filters import Filters, sort_books
-from .models import Book
+from .filters import Filters, sort_with
+from .sites import BOOKS, Site
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ START_URL = "https://books.toscrape.com/catalogue/page-1.html"
 
 @dataclass
 class ScrapeOptions:
-    url: str = START_URL
+    url: Optional[str] = None               # first page; default = the site's own start URL
     max_pages: Optional[int] = 3            # per start URL; None = every page
     categories: Tuple[str, ...] = ()        # scrape these categories instead of the whole catalogue
     all_categories: bool = False
@@ -40,8 +40,8 @@ class ScrapeOptions:
 
 @dataclass
 class ScrapeResult:
-    scraped: List[Book]                                           # everything found, before filters
-    kept: List[Book]                                              # after filters / sort / limit
+    scraped: List[Any]                                            # everything found, before filters
+    kept: List[Any]                                               # after filters / sort / limit
     failures: List[Tuple[str, str]] = field(default_factory=list)
     interrupted: bool = False
     incomplete: bool = False        # a page failed mid-crawl; results are what was collected before it
@@ -52,38 +52,57 @@ def site_index(url: str) -> str:
     return f"{parts.scheme}://{parts.netloc}/index.html"
 
 
-def run(options: ScrapeOptions, fetch: Fetch) -> ScrapeResult:
-    """Run a scrape using ``fetch(url) -> html``. Ctrl+C returns the partial result, not a crash."""
-    start_urls = [options.url]
+def _matches(options: ScrapeOptions, site: Site, item: Any) -> bool:
+    if site.book_features:
+        return options.filters.matches(item)
+    needle = options.filters.search
+    return not needle or needle.lower() in site.search_text(item).lower()
+
+
+def _identity(item: Any) -> str:
+    """Key used to drop duplicates: the item's URL if it has one, otherwise its full content."""
+    return str(getattr(item, "url", None) or repr(item))
+
+
+def run(options: ScrapeOptions, fetch: Fetch, site: Site = BOOKS) -> ScrapeResult:
+    """Run a scrape using ``fetch(url) -> html``. Ctrl+C returns the partial result, not a crash.
+
+    ``site`` says how to read the pages (default: books.toscrape.com).
+    """
+    if not site.book_features and (options.categories or options.all_categories or options.details):
+        raise WebScraperError(f"categories and detail pages are not available for the {site.name!r} site")
+    first_url = options.url or site.start_url
+    start_urls = [first_url]
     if options.categories or options.all_categories:
-        available = discover_categories(fetch, site_index(options.url))
+        available = discover_categories(fetch, site_index(first_url))
         chosen = available if options.all_categories else resolve_categories(options.categories, available)
         start_urls = [c.url for c in chosen]
         log.info("Scraping %d categor%s", len(chosen), "y" if len(chosen) == 1 else "ies")
 
-    unique: Dict[str, Book] = {}   # de-duplicate by URL, keeping first-seen order
+    unique: Dict[str, Any] = {}   # de-duplicate, keeping first-seen order
     interrupted = False
 
     def on_page(n: int, url: str, count: int) -> None:
-        log.info("Page %d: %d books  (%s)", n, count, url)
+        log.info("Page %d: %d %s  (%s)", n, count, site.item_noun, url)
 
     errors: List[WebScraperError] = []
     try:
         for start in start_urls:
             try:
-                for book in crawl(fetch, start, options.max_pages, on_page=on_page):
-                    unique.setdefault(book.url, book)
+                for item in crawl(fetch, start, options.max_pages, on_page=on_page, parse=site.parse_listing,
+                                  next_page=site.find_next, noun=site.item_noun):
+                    unique.setdefault(_identity(item), item)
             except WebScraperError as exc:   # e.g. the connection drops on page 17: keep pages 1-16
                 log.warning("stopped crawling %s: %s", start, exc)
                 errors.append(exc)
     except KeyboardInterrupt:
         interrupted = True
-        log.warning("interrupted - keeping the %d books found so far", len(unique))
+        log.warning("interrupted - keeping the %d %s found so far", len(unique), site.item_noun)
 
     if errors and not unique:
         raise errors[0]          # nothing at all was scraped: that is an error, not a partial result
 
-    books = list(unique.values())
+    books: List[Any] = list(unique.values())
     failures: List[Tuple[str, str]] = []
     if options.details and books and not interrupted:
         step = max(len(books) // 10, 1)
@@ -96,8 +115,8 @@ def run(options: ScrapeOptions, fetch: Fetch) -> ScrapeResult:
         enriched = enrich(books, fetch, workers=options.workers, on_progress=progress)
         books, failures, interrupted = enriched.books, enriched.failures, enriched.interrupted
 
-    kept = [b for b in books if options.filters.matches(b)]
-    kept = sort_books(kept, options.sort, options.descending)
+    kept = [b for b in books if _matches(options, site, b)]
+    kept = sort_with(kept, site.sort_keys, options.sort, options.descending)
     if options.limit is not None:
         kept = kept[: max(options.limit, 0)]
     return ScrapeResult(books, kept, failures, interrupted, incomplete=bool(errors))

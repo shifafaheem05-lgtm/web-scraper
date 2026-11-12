@@ -5,7 +5,7 @@ import difflib
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
-from typing import Callable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterator, List, Optional, Sequence, Tuple
 
 from .exceptions import ScrapeError, WebScraperError
 from .models import Book, Category
@@ -17,12 +17,16 @@ Fetch = Callable[[str], str]
 
 
 def crawl(fetch: Fetch, start_url: str, max_pages: Optional[int] = None,
-          on_page: Optional[Callable[[int, str, int], None]] = None) -> Iterator[Book]:
+          on_page: Optional[Callable[[int, str, int], None]] = None,
+          parse: Callable[[str, str], List[Any]] = parse_books,
+          next_page: Callable[[str, str], Optional[str]] = find_next_page,
+          noun: str = "books") -> Iterator[Any]:
     """Yield books from `start_url` onwards.
 
     fetch:      function that takes a URL and returns its HTML (injected so tests need no network)
     max_pages:  stop after this many pages (None = until there is no next page)
-    on_page:    optional progress callback(page_number, url, books_found)
+    on_page:    optional progress callback(page_number, url, items_found)
+    parse / next_page: how to read a page; defaults are for the books site (see webscraper.sites)
     """
     url: Optional[str] = start_url
     seen = set()
@@ -31,13 +35,13 @@ def crawl(fetch: Fetch, start_url: str, max_pages: Optional[int] = None,
         seen.add(url)  # protects against a 'next' link that loops back
         page_no += 1
         html = fetch(url)
-        books = parse_books(html, url)
-        if not books and page_no == 1:
-            raise ScrapeError(f"no books found on the first page ({url}) - the site layout may have changed")
+        items = parse(html, url)
+        if not items and page_no == 1:
+            raise ScrapeError(f"no {noun} found on the first page ({url}) - the site layout may have changed")
         if on_page:
-            on_page(page_no, url, len(books))
-        yield from books
-        url = find_next_page(html, url)
+            on_page(page_no, url, len(items))
+        yield from items
+        url = next_page(html, url)
 
 
 def discover_categories(fetch: Fetch, index_url: str) -> List[Category]:

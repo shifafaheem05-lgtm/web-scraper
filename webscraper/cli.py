@@ -21,14 +21,16 @@ from . import __version__
 from .cache import DiskCache
 from .client import USER_AGENT, PoliteSession
 from .crawl import discover_categories
+from .demo import build_demo_page
 from .exceptions import WebScraperError
 from .export import FORMATS, infer_format, load_books, save
-from .filters import SORT_KEYS, Filters
-from .pipeline import START_URL, ScrapeOptions, run, site_index
+from .filters import Filters
+from .pipeline import ScrapeOptions, run, site_index
+from .sites import SITES, Site, get_site
 from .stats import format_summary, summarize
 from .storage import HistoryStore, format_changes
 
-COMMANDS = ("scrape", "categories", "stats", "history")
+COMMANDS = ("scrape", "categories", "stats", "history", "sites", "demo")
 CACHE_DIR = ".webscraper_cache"
 log = logging.getLogger("webscraper")
 
@@ -37,7 +39,8 @@ log = logging.getLogger("webscraper")
 def _network_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(add_help=False)
     g = p.add_argument_group("network")
-    g.add_argument("--url", default=START_URL, help="first catalogue page (default: %(default)s)")
+    g.add_argument("--site", default="books", choices=sorted(SITES), help="which website to scrape (default books; see `webscraper sites`)")
+    g.add_argument("--url", help="first page to scrape (default: the chosen site's own start page)")
     g.add_argument("--delay", type=float, default=1.0, help="minimum seconds between requests (default 1.0)")
     g.add_argument("--timeout", type=float, default=15.0, help="seconds before a request gives up (default 15)")
     g.add_argument("--retries", type=int, default=3, help="retries on temporary errors (default 3)")
@@ -87,7 +90,8 @@ def build_parser() -> argparse.ArgumentParser:
     fl.add_argument("--max-price", type=float, help="keep books priced at or below this value")
     fl.add_argument("--in-stock", action="store_true", help="keep only books that are in stock")
     fl.add_argument("--search", metavar="TEXT", help="keep books whose title (or description/category) contains TEXT")
-    fl.add_argument("--sort", choices=sorted(SORT_KEYS), help="sort the results")
+    sort_choices = sorted({key for site in SITES.values() for key in site.sort_keys})
+    fl.add_argument("--sort", choices=sort_choices, help="sort the results (the keys depend on the site)")
     fl.add_argument("--desc", action="store_true", help="sort descending")
     fl.add_argument("--limit", type=int, help="keep only the first N results")
     out = s.add_argument_group("output")
@@ -104,6 +108,16 @@ def build_parser() -> argparse.ArgumentParser:
                         description="Summarise a CSV/JSON/JSONL file written by `scrape`.")
     st.add_argument("file")
     st.add_argument("--json", action="store_true", help="print machine-readable JSON")
+
+    sub.add_parser("sites", parents=[_logging_parser()], help="list the websites that can be scraped")
+
+    d = sub.add_parser("demo", parents=[_logging_parser()], help="build the public demo web page from a scraped file",
+                       description="Turn a CSV/JSON/JSONL file written by `scrape` into a self-contained web page "
+                                   "(for GitHub Pages: docs/index.html).")
+    d.add_argument("file", help="books file from `webscraper scrape ... -o output/books.csv`")
+    d.add_argument("-o", "--output", default="docs/index.html", help="page to write (default docs/index.html)")
+    d.add_argument("--sample", action="store_true",
+                   help="label the page as generated SAMPLE data (default: labelled as a real scrape)")
 
     h = sub.add_parser("history", parents=[_logging_parser()], help="price history from a --db file")
     h.add_argument("--db", required=True, metavar="FILE")
@@ -178,7 +192,44 @@ def _validate(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None
 
 
 # --------------------------------------------------------------------------- commands
+def _check_site_options(args: argparse.Namespace, site: Site) -> None:
+    """Options that only make sense for the books site must not be silently ignored on other sites."""
+    if site.book_features:
+        return
+    unsupported = [flag for flag, used in (
+        ("--details", args.details), ("--category/--all-categories", args.category or args.all_categories),
+        ("--min-rating/--max-rating", args.min_rating > 0 or args.max_rating < 5),
+        ("--min-price/--max-price", args.min_price is not None or args.max_price is not None),
+        ("--in-stock", args.in_stock), ("--db", args.db)) if used]
+    if unsupported:
+        raise WebScraperError(f"{', '.join(unsupported)} not available for the {site.name!r} site "
+                              f"(only --search, --sort, --limit and --max-pages are)")
+    if args.sort and args.sort not in site.sort_keys:
+        raise WebScraperError(f"cannot sort {site.name} by {args.sort!r}; choose from {', '.join(site.sort_keys)}")
+
+
+def cmd_sites(args: argparse.Namespace) -> int:
+    for site in SITES.values():
+        print(f"{site.name:<8} {site.description}\n         start: {site.start_url}")
+    return 0
+
+
+def cmd_demo(args: argparse.Namespace) -> int:
+    books = load_books(args.file)
+    if not books:
+        raise WebScraperError(f"{args.file} has no books")
+    target = Path(args.output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(build_demo_page(books, real=not args.sample), encoding="utf-8")
+    kind = "sample data" if args.sample else "real scrape"
+    print(f"Wrote {target} ({len(books)} books, labelled as {kind}).")
+    print("Next: git add docs && git commit -m 'docs: update demo' && git push")
+    return 0
+
+
 def cmd_scrape(args: argparse.Namespace) -> int:
+    site = get_site(args.site)
+    _check_site_options(args, site)
     client = _make_client(args)
     options = ScrapeOptions(
         url=args.url,
@@ -192,17 +243,16 @@ def cmd_scrape(args: argparse.Namespace) -> int:
         descending=args.desc,
         limit=args.limit,
     )
-    result = run(options, client.get)
+    result = run(options, client.get, site)
 
-    outputs = args.output or [f"output/books.{args.format or 'csv'}"]
+    outputs = args.output or [f"output/{site.table}.{args.format or 'csv'}"]
     for target in outputs:
         fmt = args.format or infer_format(target) or "csv"
-        save(result.kept, target, fmt)
+        save(result.kept, target, fmt, table=site.table, fields=site.columns or None)
 
-    stats = summarize(result.kept)
-    print(f"\nScraped {len(result.scraped)} books, kept {stats['count']} after filters -> {', '.join(outputs)}")
-    if stats["count"]:
-        print(format_summary(stats))
+    print(f"\nScraped {len(result.scraped)} {site.item_noun}, kept {len(result.kept)} after filters -> {', '.join(outputs)}")
+    if result.kept:
+        print(site.summarize(result.kept))
     else:
         print("Nothing matched your filters.")
     if args.details and result.failures:
@@ -224,8 +274,11 @@ def cmd_scrape(args: argparse.Namespace) -> int:
 
 
 def cmd_categories(args: argparse.Namespace) -> int:
+    site = get_site(args.site)
+    if not site.book_features:
+        raise WebScraperError(f"the {site.name!r} site has no categories")
     client = _make_client(args)
-    for category in discover_categories(client.get, site_index(args.url)):
+    for category in discover_categories(client.get, site_index(args.url or site.start_url)):
         print(category.name)
     return 0
 
@@ -251,7 +304,8 @@ def cmd_history(args: argparse.Namespace) -> int:
     return 0
 
 
-HANDLERS = {"scrape": cmd_scrape, "categories": cmd_categories, "stats": cmd_stats, "history": cmd_history}
+HANDLERS = {"scrape": cmd_scrape, "categories": cmd_categories, "stats": cmd_stats, "history": cmd_history,
+            "sites": cmd_sites, "demo": cmd_demo}
 
 
 def _make_streams_safe() -> None:

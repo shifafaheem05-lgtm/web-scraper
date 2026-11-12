@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from .models import Book
 
@@ -48,9 +48,15 @@ SORT_KEYS: Dict[str, Callable[[Book], object]] = {
 }
 
 
-def sort_books(books: Iterable[Book], key: Optional[str], descending: bool = False) -> List[Book]:
+def sort_with(items: Iterable[Any], keys: Dict[str, Callable[[Any], Any]], key: Optional[str],
+              descending: bool = False) -> List[Any]:
+    """Sort ``items`` by one of the named ``keys`` (None = keep order)."""
     if key is None:
-        return list(books)
-    if key not in SORT_KEYS:
-        raise ValueError(f"cannot sort by {key!r}; choose from {', '.join(SORT_KEYS)}")
-    return sorted(books, key=SORT_KEYS[key], reverse=descending)  # type: ignore[arg-type]
+        return list(items)
+    if key not in keys:
+        raise ValueError(f"cannot sort by {key!r}; choose from {', '.join(keys)}")
+    return sorted(items, key=keys[key], reverse=descending)
+
+
+def sort_books(books: Iterable[Book], key: Optional[str], descending: bool = False) -> List[Book]:
+    return sort_with(books, SORT_KEYS, key, descending)
